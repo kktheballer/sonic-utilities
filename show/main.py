@@ -1917,12 +1917,28 @@ def mmu():
     click.echo(proc.stdout.read())
 
 
-#
-# 'fg nhg active-hops' command ("show fg-nhg-active-hops")
-#
 @cli.command('fg-nhg-active-hops')
-@click.argument('nhg', required=True)
+@click.argument('nhg', required=False)
 def fg_nhg_active_hops(nhg):
+
+   
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    fg_nhg_prefix_table = {}
+    fg_nhg_alias = {}	
+    try:
+        fg_nhg_prefix_table = config_db.get_table('FG_NHG_PREFIX')
+    except:
+	click.echo ('FG_NHG_PREFIX not in config_db')
+        exit()
+
+    for key, value in fg_nhg_prefix_table.items():
+	    fg_nhg_alias[key] = value['FG_NHG']
+    
+    if fg_nhg_alias is None:
+	click.echo ('No IP Prefixes present in the FG_NHG Section')
+	exit()
+	 
     state_db = SonicV2Connector(host='127.0.0.1')
     try:
         state_db.connect(state_db.STATE_DB, False)  # Make one attempt only STATE_DB
@@ -1947,111 +1963,84 @@ def fg_nhg_active_hops(nhg):
 
     t_dict = {}
     table = []
-    key_avail = {"ipv4": None, "ipv6": None}
+   
+    if nhg is None:
+	for nhg_prefix in table_keys :
+	    t_dict = state_db.get_all(state_db.STATE_DB, nhg_prefix)
+            vals = sorted(set([val for val in t_dict.values()]))
 
-    for tk in table_keys:
-        if "." in tk:
-            key_avail['ipv4'] = tk
-        elif ":" in tk:
-            key_avail['ipv6'] = tk
+   	    for nh_ip in vals:
+        	    	bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
+        		r = []
+        		r.append(nh_ip.split("@")[0])
+        		table.append(r)
+	    nhg_prefix_report = ("NHG_PREFIX: " + nhg_prefix.split("|")[1])
+	    click.echo (nhg_prefix_report)
+            click.echo ("\n")
+	    header = ["Active Next Hops"]
+    	    click.echo(tabulate(table, header))
+	    click.echo("\n")
+	    table = []
 
-    if nhg == "fgnhg_v4":
-        if key_avail["ipv4"] is not None:
-            t_dict = state_db.get_all(state_db.STATE_DB, key_avail["ipv4"])
+	 
 
-        else:
-            click.echo("IPV4 nhg does not exist!")
-            exit()
+    else:
+	for nhg_prefix, alias in fg_nhg_alias.items():
+	    if nhg == alias:
+		if ":" in nhg_prefix:
+		    for key in table_keys:
+	 	        mod_key = key.split("|")[1].split("/")[0]
+		        mod_nhg_prefix = nhg_prefix.split("/")[0]
+			if ipaddress.ip_address(unicode(mod_key)).exploded == ipaddress.ip_address(unicode(mod_nhg_prefix)).exploded:
+                            t_dict = state_db.get_all(state_db.STATE_DB, key)
+		    nhg_prefix = "FG_ROUTE_TABLE|" + nhg_prefix	
+                else:
+			nhg_prefix = "FG_ROUTE_TABLE|" + nhg_prefix
+			t_dict = state_db.get_all(state_db.STATE_DB, nhg_prefix)
+	        	
+		vals = sorted(set([val for val in t_dict.values()]))
 
-    if nhg == "fgnhg_v6":
-        if key_avail["ipv6"] is not None:
-            t_dict = state_db.get_all(state_db.STATE_DB, key_avail["ipv6"])
-        else:
-            click.echo("IPV6 nhg does not exist!")
-            exit()
-
-    vals = sorted(set([val for val in t_dict.values()]))
-
-    for nh_ip in vals:
-        r = []
-        r.append(nh_ip.split("@")[0])
-        table.append(r)
-
-    header = ["Active Next-Hops"]
-    click.echo(tabulate(table, header))
+         	for nh_ip in vals:
+        	    	    bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
+        		    r = []
+        		    r.append(nh_ip.split("@")[0])
+        		    table.append(r)
+	        
 
 
-#
-# 'fg nhg hash-view' command ("show fg-nhg-hash-view")
-#
-@cli.command('fg-nhg-hash-view')
-@click.argument('nhg', required=True)
-def fg_nhg_hash_view(nhg):
-    state_db = SonicV2Connector(host='127.0.0.1')
-    try:
-        state_db.connect(state_db.STATE_DB, False)  # Make one attempt only STATE_DB
-    except:
-        click.echo("STATE_DB Table does not exist!")
-        exit()
+	 
+		nhg_prefix_report = ("NHG_PREFIX: " + nhg_prefix.split("|")[1])
+	        click.echo (nhg_prefix_report)
+		click.echo ("\n")
+	        header = ["Active Next Hops"]
+    	        click.echo(tabulate(table, header))
+     		click.echo("\n")
 
-    TABLE_NAME_SEPARATOR = '|'
-    prefix = 'FG_ROUTE_TABLE' + TABLE_NAME_SEPARATOR
-    _hash = '{}{}'.format(prefix, '*')
-    table_keys = []
+ 
 
-    try:
-        table_keys = state_db.keys(state_db.STATE_DB, _hash)
-    except:
-        click.echo("FG_ROUTE_TABLE does not exist!")
-        exit()
 
-    if table_keys is None:
-        click.echo("FG_ROUTE_TABLE does not contain any keys!")
-        exit()
-
-    t_dict = {}
-    table = []
-    key_avail = {"ipv4": None, "ipv6": None}
-
-    for tk in table_keys:
-        if "." in tk:
-            key_avail['ipv4'] = tk
-        elif ":" in tk:
-            key_avail['ipv6'] = tk
-
-    if nhg == "fgnhg_v4":
-        if key_avail["ipv4"] is not None:
-            t_dict = state_db.get_all(state_db.STATE_DB, key_avail["ipv4"])
-
-        else:
-            click.echo("IPV4 nhg does not exist!")
-            exit()
-
-    if nhg == "fgnhg_v6":
-        if key_avail["ipv6"] is not None:
-            t_dict = state_db.get_all(state_db.STATE_DB, key_avail["ipv6"])
-        else:
-            click.echo("IPV6 nhg does not exist!")
-            exit()
-
-    vals = sorted(set([val for val in t_dict.values()]))
-
-    for nh_ip in vals:
-        bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
-        r = []
-        r.append(nh_ip.split("@")[0])
-        r.append(sorted(bank_ids))
-        table.append(r)
-
-    header = ["Next-Hop-Key", "Hash Bucket #"]
-    click.echo(tabulate(table, header))
-
-#
-# 'fg nhg group' command ("show fg-nhg-group")
-#
 @cli.command('fg-nhg-group')
-@click.argument('nhg', required=True)
+@click.argument('nhg', required=False)
 def fg_nhg_group(nhg):
+
+   
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    fg_nhg_prefix_table = {}
+    fg_nhg_alias = {}	
+    try:
+        fg_nhg_prefix_table = config_db.get_table('FG_NHG_PREFIX')
+    except:
+	click.echo ('FG_NHG_PREFIX not in config_db')
+        exit()
+
+    for key, value in fg_nhg_prefix_table.items():
+	    fg_nhg_alias[key] = value['FG_NHG']
+    
+    if fg_nhg_alias is None:
+	click.echo ('No IP Prefixes present in the FG_NHG Section')
+	exit()
+	 
     state_db = SonicV2Connector(host='127.0.0.1')
     try:
         state_db.connect(state_db.STATE_DB, False)  # Make one attempt only STATE_DB
@@ -2076,49 +2065,159 @@ def fg_nhg_group(nhg):
 
     t_dict = {}
     table = []
-    ip_prefix = ""
-    key_avail = {"ipv4": None, "ipv6": None}
+   
+    if nhg is None:
+	for nhg_prefix in table_keys :
+	    t_dict = state_db.get_all(state_db.STATE_DB, nhg_prefix)
+            vals = sorted(set([val for val in t_dict.values()]))
 
-    for tk in table_keys:
-        if "." in tk:
-            key_avail['ipv4'] = tk
-        elif ":" in tk:
-            key_avail['ipv6'] = tk
+   	    for nh_ip in vals:
+        	    	bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
+        		r = []
+        		r.append(nh_ip.split("@")[0])
+        		r.append(sorted(bank_ids))
+        		table.append(r)
+	    nhg_prefix_report = ("NHG_PREFIX: " + nhg_prefix.split("|")[1])
+	    click.echo (nhg_prefix_report)
+            click.echo ("\n")
+	    header = ["Next-Hop-Key", "Hash Bucket #"]
+    	    click.echo(tabulate(table, header))
+	    click.echo("\n")
+	    table = []
 
-    if nhg == "fgnhg_v4":
-        if key_avail["ipv4"] is not None:
-            t_dict = state_db.get_all(state_db.STATE_DB, key_avail["ipv4"])
-            ip_prefix = key_avail["ipv4"]
-        else:
-            click.echo("IPV4 nhg does not exist!")
-            exit()
+	hash_bucket_size = len(t_dict)
+        hash_bucket_report = ("Hash Bucket Size: " + str(hash_bucket_size))
+        click.echo("\n")
+	click.echo (hash_bucket_report)
 
-    if nhg == "fgnhg_v6":
-        if key_avail["ipv6"] is not None:
-            t_dict = state_db.get_all(state_db.STATE_DB, key_avail["ipv6"])
-            ip_prefix = key_avail["ipv6"]
-        else:
-            click.echo("IPV6 nhg does not exist!")
-            exit()
+    else:
+	for nhg_prefix, alias in fg_nhg_alias.items():
+	    if nhg == alias:
+		if ":" in nhg_prefix:
+		    for key in table_keys:
+	 	        mod_key = key.split("|")[1].split("/")[0]
+		        mod_nhg_prefix = nhg_prefix.split("/")[0]
+			if ipaddress.ip_address(unicode(mod_key)).exploded == ipaddress.ip_address(unicode(mod_nhg_prefix)).exploded:
+                            t_dict = state_db.get_all(state_db.STATE_DB, key)
+		    nhg_prefix = "FG_ROUTE_TABLE|" + nhg_prefix	
+                else:
+			nhg_prefix = "FG_ROUTE_TABLE|" + nhg_prefix
+			t_dict = state_db.get_all(state_db.STATE_DB, nhg_prefix)
+	        	
+		vals = sorted(set([val for val in t_dict.values()]))
 
-    hash_bucket_size = len(t_dict)
+         	for nh_ip in vals:
+        	    	    bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
+        		    r = []
+        		    r.append(nh_ip.split("@")[0])
+        		    r.append(sorted(bank_ids))
+        		    table.append(r)
+	        
 
-    vals = sorted(set([val for val in t_dict.values()]))
 
-    for nh_ip in vals:
-        bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
-        r = []
-        r.append(nh_ip.split("@")[0])
-        r.append(sorted(bank_ids))
-        table.append(r)
+	 
+		nhg_prefix_report = ("NHG_PREFIX: " + nhg_prefix.split("|")[1])
+	        click.echo (nhg_prefix_report)
+		click.echo ("\n")
+	        header = ["Next-Hop-Key", "Hash Bucket #"]
+    	        click.echo(tabulate(table, header))
+     		click.echo("\n")
+		hash_bucket_size = len(t_dict)
+		hash_bucket_report = ("Hash Bucket Size: " + str(hash_bucket_size))
+	        click.echo (hash_bucket_report)
 
-    header = ["Next-Hop-Key", "Hash Bucket #"]
-    click.echo("\nNHG_PREFIX: ")
-    click.echo(ip_prefix.split("|")[1])
-    click.echo("\nHash Bucket Size: ")
-    click.echo(hash_bucket_size)
-    click.echo("\n")
-    click.echo(tabulate(table, header))
+
+@cli.command('fg-nhg-hash-view')
+@click.argument('nhg', required=False)
+def fg_nhg_hash_view(nhg):
+
+   
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    fg_nhg_prefix_table = {}
+    fg_nhg_alias = {}	
+    try:
+        fg_nhg_prefix_table = config_db.get_table('FG_NHG_PREFIX')
+    except:
+	click.echo ('FG_NHG_PREFIX not in config_db')
+        exit()
+
+    for key, value in fg_nhg_prefix_table.items():
+	    fg_nhg_alias[key] = value['FG_NHG']
+    
+    if fg_nhg_alias is None:
+	click.echo ('No IP Prefixes present in the FG_NHG Section')
+	exit()
+	 
+    state_db = SonicV2Connector(host='127.0.0.1')
+    try:
+        state_db.connect(state_db.STATE_DB, False)  # Make one attempt only STATE_DB
+    except:
+        click.echo("STATE_DB Table does not exist!")
+        exit()
+
+    TABLE_NAME_SEPARATOR = '|'
+    prefix = 'FG_ROUTE_TABLE' + TABLE_NAME_SEPARATOR
+    _hash = '{}{}'.format(prefix, '*')
+    table_keys = []
+
+    try:
+        table_keys = state_db.keys(state_db.STATE_DB, _hash)
+    except:
+        click.echo("FG_ROUTE_TABLE does not exist!")
+        exit()
+
+    if table_keys is None:
+        click.echo("FG_ROUTE_TABLE does not contain any keys!")
+        exit()
+
+    t_dict = {}
+    table = []
+   
+    if nhg is None:
+	for nhg_prefix in table_keys :
+	    t_dict = state_db.get_all(state_db.STATE_DB, nhg_prefix)
+            vals = sorted(set([val for val in t_dict.values()]))
+
+   	    for nh_ip in vals:
+        	    	bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
+        		r = []
+        		r.append(nh_ip.split("@")[0])
+        		r.append(sorted(bank_ids))
+        		table.append(r)
+	    click.echo (nhg_prefix.split("|")[1])
+	    header = ["Next-Hop-Key", "Hash Bucket #"]
+    	    click.echo(tabulate(table, header)) 
+	    click.echo("\n\n")  	
+	    table = []
+
+    else:
+	for nhg_prefix, alias in fg_nhg_alias.items():
+	    if nhg == alias:
+		if ":" in nhg_prefix:
+		    for key in table_keys:
+	 	        mod_key = key.split("|")[1].split("/")[0]
+		        mod_nhg_prefix = nhg_prefix.split("/")[0]
+			if ipaddress.ip_address(unicode(mod_key)).exploded == ipaddress.ip_address(unicode(mod_nhg_prefix)).exploded:
+                            t_dict = state_db.get_all(state_db.STATE_DB, key)
+		    nhg_prefix = "FG_ROUTE_TABLE|" + nhg_prefix
+                else:
+			nhg_prefix = "FG_ROUTE_TABLE|" + nhg_prefix
+			t_dict = state_db.get_all(state_db.STATE_DB, nhg_prefix)
+	        	
+		vals = sorted(set([val for val in t_dict.values()]))
+
+         	for nh_ip in vals:
+        	    	    bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
+        		    r = []
+        		    r.append(nh_ip.split("@")[0])
+        		    r.append(sorted(bank_ids))
+        		    table.append(r)
+	        
+		
+	        header = ["Next-Hop-Key", "Hash Bucket #"]
+    	        click.echo(tabulate(table, header))
+	     
 
 
 #
