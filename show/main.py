@@ -2483,6 +2483,198 @@ def mmu():
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
     click.echo(proc.stdout.read())
 
+@cli.command('fg-nhg-active-hops')
+@click.argument('nhg', required=False)
+def fg_nhg_active_hops(nhg):
+
+   
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    fg_nhg_prefix_table = {}
+    fg_nhg_alias = {}	
+    try:
+        fg_nhg_prefix_table = config_db.get_table('FG_NHG_PREFIX')
+    except:
+	click.echo ('FG_NHG_PREFIX not in config_db')
+        exit()
+
+    for key, value in fg_nhg_prefix_table.items():
+	    fg_nhg_alias[key] = value['FG_NHG']
+    
+    if fg_nhg_alias is None:
+	click.echo ('No IP Prefixes present in the FG_NHG Section')
+	exit()
+	 
+    state_db = SonicV2Connector(host='127.0.0.1')
+    try:
+        state_db.connect(state_db.STATE_DB, False)  # Make one attempt only STATE_DB
+    except:
+        click.echo("STATE_DB Table does not exist!")
+        exit()
+
+    TABLE_NAME_SEPARATOR = '|'
+    prefix = 'FG_ROUTE_TABLE' + TABLE_NAME_SEPARATOR
+    _hash = '{}{}'.format(prefix, '*')
+    table_keys = []
+
+    try:
+        table_keys = state_db.keys(state_db.STATE_DB, _hash)
+    except:
+        click.echo("FG_ROUTE_TABLE does not exist!")
+        exit()
+
+    if table_keys is None:
+        click.echo("FG_ROUTE_TABLE does not contain any keys!")
+        exit()
+
+    t_dict = {}
+    table = []
+   
+    if nhg is None:
+	for nhg_prefix in table_keys :
+	    t_dict = state_db.get_all(state_db.STATE_DB, nhg_prefix)
+            vals = sorted(set([val for val in t_dict.values()]))
+
+   	    for nh_ip in vals:
+        	    	bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
+        		r = []
+        		r.append(nh_ip.split("@")[0])
+        		table.append(r)
+	    nhg_prefix_report = ("NHG_PREFIX: " + nhg_prefix.split("|")[1])
+	    click.echo (nhg_prefix_report)
+            click.echo ("\n")
+	    header = ["Active Next Hops"]
+    	    click.echo(tabulate(table, header))
+	    click.echo("\n")
+	    table = []
+
+	 
+
+    else:
+	for nhg_prefix, alias in fg_nhg_alias.items():
+	    if nhg == alias:
+		if ":" in nhg_prefix:
+		    for key in table_keys:
+	 	        mod_key = key.split("|")[1].split("/")[0]
+		        mod_nhg_prefix = nhg_prefix.split("/")[0]
+			if ipaddress.ip_address(unicode(mod_key)).exploded == ipaddress.ip_address(unicode(mod_nhg_prefix)).exploded:
+                            t_dict = state_db.get_all(state_db.STATE_DB, key)
+		    nhg_prefix = "FG_ROUTE_TABLE|" + nhg_prefix	
+                else:
+			nhg_prefix = "FG_ROUTE_TABLE|" + nhg_prefix
+			t_dict = state_db.get_all(state_db.STATE_DB, nhg_prefix)
+	        	
+		vals = sorted(set([val for val in t_dict.values()]))
+
+         	for nh_ip in vals:
+        	    	    bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
+        		    r = []
+        		    r.append(nh_ip.split("@")[0])
+        		    table.append(r)
+	        
+
+
+	 
+		nhg_prefix_report = ("NHG_PREFIX: " + nhg_prefix.split("|")[1])
+	        click.echo (nhg_prefix_report)
+		click.echo ("\n")
+	        header = ["Active Next Hops"]
+    	        click.echo(tabulate(table, header))
+     		click.echo("\n")
+ 
+@cli.command('fg-nhg-hash-view')
+@click.argument('nhg', required=False)
+def fg_nhg_hash_view(nhg):
+
+   
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    fg_nhg_prefix_table = {}
+    fg_nhg_alias = {}	
+    try:
+        fg_nhg_prefix_table = config_db.get_table('FG_NHG_PREFIX')
+    except:
+	click.echo ('FG_NHG_PREFIX not in config_db')
+        exit()
+
+    for key, value in fg_nhg_prefix_table.items():
+	    fg_nhg_alias[key] = value['FG_NHG']
+    
+    if fg_nhg_alias is None:
+	click.echo ('No IP Prefixes present in the FG_NHG Section')
+	exit()
+	 
+    state_db = SonicV2Connector(host='127.0.0.1')
+    try:
+        state_db.connect(state_db.STATE_DB, False)  # Make one attempt only STATE_DB
+    except:
+        click.echo("STATE_DB Table does not exist!")
+        exit()
+
+    TABLE_NAME_SEPARATOR = '|'
+    prefix = 'FG_ROUTE_TABLE' + TABLE_NAME_SEPARATOR
+    _hash = '{}{}'.format(prefix, '*')
+    table_keys = []
+
+    try:
+        table_keys = state_db.keys(state_db.STATE_DB, _hash)
+    except:
+        click.echo("FG_ROUTE_TABLE does not exist!")
+        exit()
+
+    if table_keys is None:
+        click.echo("FG_ROUTE_TABLE does not contain any keys!")
+        exit()
+
+    t_dict = {}
+    table = []
+   
+    if nhg is None:
+	for nhg_prefix in table_keys :
+	    t_dict = state_db.get_all(state_db.STATE_DB, nhg_prefix)
+            vals = sorted(set([val for val in t_dict.values()]))
+
+   	    for nh_ip in vals:
+        	    	bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
+        		r = []
+        		r.append(nh_ip.split("@")[0])
+        		r.append(sorted(bank_ids))
+        		table.append(r)
+	    click.echo (nhg_prefix.split("|")[1])
+	    header = ["Next-Hop-Key", "Hash Bucket #"]
+    	    click.echo(tabulate(table, header)) 
+	    click.echo("\n\n")  	
+	    table = []
+
+    else:
+	for nhg_prefix, alias in fg_nhg_alias.items():
+	    if nhg == alias:
+		if ":" in nhg_prefix:
+		    for key in table_keys:
+	 	        mod_key = key.split("|")[1].split("/")[0]
+		        mod_nhg_prefix = nhg_prefix.split("/")[0]
+			if ipaddress.ip_address(unicode(mod_key)).exploded == ipaddress.ip_address(unicode(mod_nhg_prefix)).exploded:
+                            t_dict = state_db.get_all(state_db.STATE_DB, key)
+		    nhg_prefix = "FG_ROUTE_TABLE|" + nhg_prefix
+                else:
+			nhg_prefix = "FG_ROUTE_TABLE|" + nhg_prefix
+			t_dict = state_db.get_all(state_db.STATE_DB, nhg_prefix)
+	        	
+		vals = sorted(set([val for val in t_dict.values()]))
+
+         	for nh_ip in vals:
+        	    	    bank_ids = [int(k) for k, v in t_dict.items() if v == nh_ip]
+        		    r = []
+        		    r.append(nh_ip.split("@")[0])
+        		    r.append(sorted(bank_ids))
+        		    table.append(r)
+	        
+		
+	        header = ["Next-Hop-Key", "Hash Bucket #"]
+    	        click.echo(tabulate(table, header))
+	     
+
+
 
 #
 # 'reboot-cause' command ("show reboot-cause")
