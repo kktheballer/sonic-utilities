@@ -2443,10 +2443,10 @@ def fg_nhg_active_hops(nhg):
                     output_dict[nhg_prefix] = [nh_ip.split("@")[0]]
 
             nhg_prefix_report = (nhg_prefix.split("|")[1])
-            formatted_nhps = ','.replace(',', '\n').join(output_dict[nhg_prefix])
+            formatted_nhps = ','.replace(',', ', ').join(output_dict[nhg_prefix])
             table.append([nhg_prefix_report, formatted_nhps])
 
-        click.echo(tabulate(table, header, tablefmt="grid"))
+        click.echo(tabulate(table, header))
 
     else:
         for nhg_prefix, alias in fg_nhg_alias.items():
@@ -2471,9 +2471,9 @@ def fg_nhg_active_hops(nhg):
                         output_dict[nhg_prefix] = [nh_ip.split("@")[0]]
 
                 nhg_prefix_report = (nhg_prefix.split("|")[1])
-                formatted_nhps = ','.replace(',', '\n').join(output_dict[nhg_prefix])
+                formatted_nhps = ','.replace(',', ', ').join(output_dict[nhg_prefix])
                 table.append([nhg_prefix_report, formatted_nhps])
-                click.echo(tabulate(table, header, tablefmt="grid"))
+                click.echo(tabulate(table, header))
     
     
 @cli.command('fg-nhg-hash-view')
@@ -2538,10 +2538,10 @@ def fg_nhg_hash_view(nhg):
             nhg_prefix_report = (nhg_prefix.split("|")[1])
 
             for nhip, val in bank_dict.items():
-                formatted_banks = ','.replace(',', '\n').join(bank_dict[nhip])
+                formatted_banks = ','.replace(',', ', ').join(bank_dict[nhip])
                 table.append([nhg_prefix_report, nhip, formatted_banks])
 
-        click.echo(tabulate(table, header, tablefmt="grid"))
+        click.echo(tabulate(table, header))
 
     else:
         for nhg_prefix, alias in fg_nhg_alias.items():
@@ -2572,10 +2572,10 @@ def fg_nhg_hash_view(nhg):
                 bank_dict = OrderedDict(sorted(bank_dict.items()))
 
                 for nhip, val in bank_dict.items():
-                    formatted_banks = ','.replace(',', '\n').join(bank_dict[nhip])
+                    formatted_banks = ','.replace(',', ', ').join(bank_dict[nhip])
                     table.append([nhg_prefix_report, nhip, formatted_banks])
 
-                click.echo(tabulate(table, header, tablefmt="grid")) 
+                click.echo(tabulate(table, header)) 
 
 
 
